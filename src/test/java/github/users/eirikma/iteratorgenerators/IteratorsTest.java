@@ -35,7 +35,7 @@ public class IteratorsTest {
         Iterator<String> generator = generator(new Generator<String>() {
             int count = 0;
             @Override
-            public void nextValue(GeneratorState state) {
+            public void nextValue(GeneratorOutput state) {
                 if ( count++ < 4) {
                     state.yield("test-" + count);
                 }
@@ -55,7 +55,7 @@ public class IteratorsTest {
 
             int count = 0;
             @Override
-            public void nextValue(GeneratorState state) {
+            public void nextValue(GeneratorOutput state) {
                 if ( count++ < 4) {
                     state.yield("test-" + count);
                 }
@@ -63,7 +63,8 @@ public class IteratorsTest {
         });
 
         assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
-        assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
+
+        assertThat(collect(((Iterable<String>) generator).iterator()), is(asList("test-1", "test-2", "test-3", "test-4")));
     }
 
     @Test

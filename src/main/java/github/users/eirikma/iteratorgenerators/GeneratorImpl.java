@@ -3,10 +3,12 @@ package github.users.eirikma.iteratorgenerators;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
+import java.util.Stack;
 
-class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T> {
-    private  GeneratorState<T> state;
+class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T>, PushBackIterator<T> {
+    private GeneratorOutput<T> state;
     private final LinkedList<T> output = new LinkedList<>();
+    private final Stack<T> pushbacks = new Stack<>();
     private final Generator<T> generator;
 
     GeneratorImpl(Generator<T> g) {
@@ -15,7 +17,8 @@ class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T> {
     }
 
     private void reInitialize() {
-        state = new GeneratorState<T>() {
+        pushbacks.clear();
+        state = new GeneratorOutput<T>() {
             T last = null;
             @Override
             public void yield(T value) {
@@ -38,6 +41,7 @@ class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T> {
 
     @Override
     public boolean hasNext() {
+        if (pushbacks.size() > 0) return true;
         if (output.size() > 0) return true;
         generator.nextValue(state);
         return output.size() > 0;
@@ -46,6 +50,9 @@ class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T> {
     @Override
     public T next() {
         if (hasNext()) {
+            if (pushbacks.size() > 0) {
+                return pushbacks.pop();
+            }
             return output.removeFirst();
         }
         throw new NoSuchElementException("'next'");
@@ -54,5 +61,10 @@ class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T> {
     @Override
     public void reset() {
         reInitialize();
+    }
+
+    @Override
+    public void pushback(T element) {
+        pushbacks.push(element);
     }
 }

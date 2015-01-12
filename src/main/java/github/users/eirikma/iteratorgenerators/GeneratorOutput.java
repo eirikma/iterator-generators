@@ -1,6 +1,6 @@
 package github.users.eirikma.iteratorgenerators;
 
-public interface GeneratorState<T> {
+public interface GeneratorOutput<T> {
     void yield(T value);
     public T last();
 }
