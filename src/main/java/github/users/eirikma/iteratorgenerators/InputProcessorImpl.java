@@ -51,13 +51,13 @@ class InputProcessorImpl<I,O> implements Iterator<O>, Iterable<O>, PushBackItera
     public boolean hasNext() {
         if (pushbacks.size() > 0) return true;
         if (output.size() > 0) return true;
+        counter++;
         generator.nextValue(input, state);
         return output.size() > 0;
     }
 
     @Override
     public O next() {
-        counter++;
         if (hasNext()) {
              if (pushbacks.size() > 0) {
                  return pushbacks.pop();

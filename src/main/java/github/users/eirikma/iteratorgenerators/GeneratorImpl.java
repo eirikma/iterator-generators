@@ -50,13 +50,14 @@ class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T>, PushBackIt
     public boolean hasNext() {
         if (pushbacks.size() > 0) return true;
         if (output.size() > 0) return true;
+        counter++;
         generator.nextValue(state);
         return output.size() > 0;
     }
 
     @Override
     public T next() {
-        counter++;
+
         if (hasNext()) {
             if (pushbacks.size() > 0) {
                 return pushbacks.pop();

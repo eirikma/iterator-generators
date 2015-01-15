@@ -9,6 +9,7 @@ import static java.util.Arrays.asList;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 public class IteratorsTest {
 
@@ -32,21 +33,16 @@ public class IteratorsTest {
 
     @Test
     public void testGeneratorShouldIterateAllValuesProduced() throws Exception {
-        Iterator<String> generator = generator(new Generator<String>() {
-            int count = 0;
-            @Override
-            public void nextValue(GeneratorOutput state) {
-                if ( count++ < 4) {
-                    state.yield("test-" + count);
-                }
+        RepeatableIterator<String> generator = generator(state -> {
+            if ( state.invocationNumber() < 5) {
+                state.yield("test-" + state.invocationNumber());
             }
         });
-
         assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
     }
 
     @Test
-    public void generatorShouldBeAbleToIterateSeveralTimes() {
+    public void generatorShouldBeAbleToIterateSeveralTimesWithReinitializationInClosure() {
         RepeatableIterator<String> generator = generator(new Generator<String>() {
             @Override
             public void initialize() {
@@ -90,6 +86,12 @@ public class IteratorsTest {
         assertThat(first, is("A"));
         pushBackIterator.pushback(first);
         assertThat(collect(pushBackIterator), is(asList("A", "B", "C")));
+    }
+
+
+    @Test
+    public void testInputProcessorShouldTransformInput() throws Exception {
+        fail("not implemented");
     }
 
 }
