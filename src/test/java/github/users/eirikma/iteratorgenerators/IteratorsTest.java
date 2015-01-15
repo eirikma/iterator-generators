@@ -1,10 +1,14 @@
 package github.users.eirikma.iteratorgenerators;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Iterator;
+import java.util.Map;
 
 import static github.users.eirikma.iteratorgenerators.Iterators.*;
+import static github.users.eirikma.iteratorgenerators.Maps.entry;
+import static github.users.eirikma.iteratorgenerators.Maps.map;
 import static java.util.Arrays.asList;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
@@ -56,6 +60,23 @@ public class IteratorsTest {
         });
         assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
     }
+
+    @Test
+    public void generatorWithPreviousAndCountCanHoldState() {
+        assertThat(collect(
+                           generator(0, state -> {
+                               if (state.invocationNumber() > 4) {
+                                   return;
+                               }
+                               final Integer prev = state.context();
+                               int value = prev + 1;
+                               state.yield("" + prev + "-is-followed-by-" + value);
+                               state.setContext(value);
+                           })
+                   ),
+                   is(asList("0-is-followed-by-1", "1-is-followed-by-2", "2-is-followed-by-3", "3-is-followed-by-4")));
+    }
+
 
     @Test
     public void generatorShouldBeAbleToIterateSeveralTimesWithReinitializationInClosure() {
@@ -129,6 +150,63 @@ public class IteratorsTest {
                 })),
                 is(asList("value-ctx-1", "value-ctx-2", "value-ctx-3"))
         );
+    }
+
+
+    @Test
+    public void flattenShouldFlattenIterators() {
+        assertThat(collect(
+                           flatten(values(
+                                   values(),
+                                   values("a", "b", "c"),
+                                   values("d"),
+                                   values(),
+                                   values("e", "f")
+                           ))
+                   ),
+                is(asList("a", "b", "c", "d", "e", "f"))
+        );
+    }
+
+
+
+    /** a somewhat long example to demonstrate the viability of the iterator approach:  parse some imaginary sql files in oracle sql plus syntax */
+    @Test
+    @Ignore
+    public void parseComplexInputInPipelineShouldBeShortAndReadableCode() throws Exception {
+
+        // an imaginary set of sql files (with file contents). lets keep'em here for readability
+        Map<String, String> sqlFiles = map(
+                entry("install-all-prod.sql", "\n"
+                                              + "-- setup file for prod \n"
+                                              + "define app_env 'prod'; \n"
+                                              + "@setup-all.sql;\n"
+                                              + ""),
+
+                entry("setup-all.sql", "\n"
+                                       + "@create_users.sql;\n"
+                                       + "@create_schema.sql;\n"
+                                       + "@insert-config-data-&app_env..sql;\n"
+                                       + ""),
+
+                entry("create-users.sql", "\n"
+                                          + " define APP_USER 'APPLICATION_&app_env.' ; \n"
+                                          + "\n"
+                                          + "create user &APP_USER. identified by &APP_USER. ; \n"
+                                          + "grant resource to &APP_USER. ;\n"
+                                          + ""),
+
+                entry("create-schema.sql", "-- set up application tables . \n"
+                                           + "\n"
+                                           + "-- bloody table \n"
+                                           + "create table fil ("
+                                           + "  id number(19,0) primary key,"
+                                           + "  fileName varchar2(255) not null,"
+                                           + "  c"),
+
+                entry("insert-config-data-prod.sql", "")
+        );
+
     }
 
 }

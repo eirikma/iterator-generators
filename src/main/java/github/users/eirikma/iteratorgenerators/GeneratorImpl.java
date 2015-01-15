@@ -6,7 +6,12 @@ import java.util.NoSuchElementException;
 import java.util.Stack;
 
 class GeneratorImpl<T,C> implements RepeatableIterator<T>, Iterable<T>, PushBackIterator<T> {
-    private final C context;
+    class Holder<T> {
+        T t;
+        T get(){return t;}
+        void set(T value) {t = value;}
+    }
+    private final Holder<C> context = new Holder<>();
     private long counter = 0L;
     private GeneratorState<T,C> state;
     private final LinkedList<T> output = new LinkedList<>();
@@ -15,7 +20,7 @@ class GeneratorImpl<T,C> implements RepeatableIterator<T>, Iterable<T>, PushBack
 
     GeneratorImpl(Generator<T,C> g, C context) {
         generator = g;
-        this.context = context;
+        this.context.set(context);
         reInitialize();
     }
     GeneratorImpl(Generator<T,C> g) {
@@ -44,10 +49,19 @@ class GeneratorImpl<T,C> implements RepeatableIterator<T>, Iterable<T>, PushBack
 
             @Override
             public C context() {
-                return context;
+                return context.get();
             }
+            @Override
+            public void setContext(C newValue) {
+                context.set(newValue);
+            }
+
         };
-        generator.initialize();
+        try {
+            generator.initialize();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -61,7 +75,11 @@ class GeneratorImpl<T,C> implements RepeatableIterator<T>, Iterable<T>, PushBack
         if (pushbacks.size() > 0) return true;
         if (output.size() > 0) return true;
         counter++;
-        generator.nextValue(state);
+        try {
+            generator.nextValue(state);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         return output.size() > 0;
     }
 

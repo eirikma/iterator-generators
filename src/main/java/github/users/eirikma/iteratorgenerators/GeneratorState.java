@@ -5,4 +5,5 @@ public interface GeneratorState<T,C> {
     public T last();
     long invocationNumber();
     public C context();
+    public void setContext(C newValue);
 }

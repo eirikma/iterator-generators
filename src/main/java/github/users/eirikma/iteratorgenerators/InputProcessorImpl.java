@@ -6,7 +6,12 @@ import java.util.NoSuchElementException;
 import java.util.Stack;
 
 class InputProcessorImpl<C, I,O> implements Iterator<O>, Iterable<O>, PushBackIterator<O> {
-    private C context;
+    class Holder<T> {
+        T t;
+        T get(){return t;}
+        void set(T value) {t = value;}
+    }
+    private final Holder<C> context = new Holder<>();
     private GeneratorState<O,C> state;
     private long counter = 0L;
     private final LinkedList<O> output = new LinkedList<>();
@@ -19,7 +24,7 @@ class InputProcessorImpl<C, I,O> implements Iterator<O>, Iterable<O>, PushBackIt
     }
 
     InputProcessorImpl(C context, PushBackIterator<I> input, InputProcessor<I, O, C> p) {
-        this.context = context;
+        this.context.set(context);
         this.input = input;
         generator = p;
         reInitialize();
@@ -46,10 +51,19 @@ class InputProcessorImpl<C, I,O> implements Iterator<O>, Iterable<O>, PushBackIt
 
             @Override
             public C context() {
-                return context;
+                return context.get();
+            }
+
+            @Override
+            public void setContext(C newValue) {
+                context.set(newValue);
             }
         };
-        generator.initialize();
+        try {
+            generator.initialize();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -63,7 +77,11 @@ class InputProcessorImpl<C, I,O> implements Iterator<O>, Iterable<O>, PushBackIt
         if (pushbacks.size() > 0) return true;
         if (output.size() > 0) return true;
         counter++;
-        generator.nextValue(input, state);
+        try {
+            generator.nextValue(input, state);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         return output.size() > 0;
     }
 

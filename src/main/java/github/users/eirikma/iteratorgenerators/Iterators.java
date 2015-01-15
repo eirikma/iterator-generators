@@ -79,6 +79,36 @@ public final class Iterators {
     }
 
 
+    /**
+     * flattens one level of iterators: iterating the values contained in the provided iterators.
+     * @param iterators and iterator over iterators
+     * @param <T> type of elements in those iterators
+     * @return the elements inside the iterators
+     */
+    public static <T> Iterator<T> flatten(Iterator<Iterator<T>> iterators) {
+        return generator(new Generator<T, Void>() {
+            Iterator<T> currentIterator = null;
+
+            @Override
+            public void initialize() throws Exception {
+                if (iterators.hasNext()) {
+                    currentIterator = iterators.next();
+                }
+            }
+
+            @Override
+            public void nextValue(GeneratorState<T, Void> state) throws Exception {
+                while (currentIterator != null && !currentIterator.hasNext()) {
+                    currentIterator = (iterators.hasNext() ? iterators.next() : null);
+                }
+                if (currentIterator != null && currentIterator.hasNext()) {
+                    state.yield(currentIterator.next());
+                }
+            }
+        });
+    }
+
+
     public static <T> Collection<T> collect(final Iterator<T> iterator) {
         ArrayList<T> retval = new ArrayList<T>();
         while (iterator.hasNext()) {
@@ -101,7 +131,7 @@ public final class Iterators {
         if (iterator instanceof RepeatableIterator) {
             return (RepeatableIterator<T>) iterator;
         }
-        throw new UnsupportedOperationException("repeatable");
+        throw new UnsupportedOperationException("make repeatable: " + iterator.getClass());
     }
 
     public static <T> PushBackIterator<T> pushbackable(final Iterator<T> source) {
