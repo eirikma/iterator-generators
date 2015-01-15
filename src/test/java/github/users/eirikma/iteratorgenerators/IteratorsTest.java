@@ -18,11 +18,26 @@ public class IteratorsTest {
         assertThat(values('a', 'b', 'c'), instanceOf(Iterator.class));
         assertThat(values('a', 'b').hasNext(), is(true));
         assertThat(values('a').next(), is('a'));
+
+        // typical iterator usage with 'while' loop
+        Iterator<String> numbers = values("1", "2", "3");
+        while(numbers.hasNext()) {
+            int number = Integer.parseInt(numbers.next());
+            // do something with 'number'
+            assertThat(number > 0, is(true));
+        }
     }
 
     @Test
     public void testEachOfShouldCreateIterable() throws Exception {
         assertThat(eachOf(values('a', 'b', 'c')), instanceOf(Iterable.class));
+
+        // typical iterator/iterable usage with 'for' loop:
+        Iterator<String> values = values("A", "B", "C");
+        for(String v: eachOf(values)) {
+            // do something with value v
+            assertThat(v.length(), is(1));
+        }
     }
 
     @Test
