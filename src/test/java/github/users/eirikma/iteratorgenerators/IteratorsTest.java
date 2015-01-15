@@ -15,6 +15,7 @@ public class IteratorsTest {
 
     @Test
     public void testValuesShouldIterateAllValues() throws Exception {
+
         assertThat(values('a', 'b', 'c'), instanceOf(Iterator.class));
         assertThat(values('a', 'b').hasNext(), is(true));
         assertThat(values('a').next(), is('a'));
@@ -30,6 +31,7 @@ public class IteratorsTest {
 
     @Test
     public void testEachOfShouldCreateIterable() throws Exception {
+
         assertThat(eachOf(values('a', 'b', 'c')), instanceOf(Iterable.class));
 
         // typical iterator/iterable usage with 'for' loop:
@@ -58,16 +60,14 @@ public class IteratorsTest {
     @Test
     public void generatorShouldBeAbleToIterateSeveralTimesWithReinitializationInClosure() {
         RepeatableIterator<String> generator = generator(new Generator<String, Void>() {
+            int count = 0;
             @Override
             public void initialize() {
                 count = 0;
             }
-
-            int count = 0;
-
             @Override
             public void nextValue(GeneratorState<String, Void> state) {
-                if (count++ < 4) {
+                if (++count < 5) {
                     state.yield("test-" + count);
                 }
             }
