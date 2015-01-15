@@ -17,7 +17,7 @@ public final class Iterators {
     }
 
 
-    public static <T> Iterator<T> generator(Generator<T> g) {
+    public static <T> RepeatableIterator<T> generator(Generator<T> g) {
         return new GeneratorImpl<T>(g);
     }
 
@@ -37,6 +37,17 @@ public final class Iterators {
         Collection<T> collection = collect(iter);
         T[] array = (T[]) Array.newInstance(type, collection.size());
         return collection.toArray(array);
+    }
+
+    /**
+     * typesafe cast, but it cannot actually make non-repeatable iterators repeatable,
+     * which sometimes only can be done through a collection (see repeatable(collect(iterator))
+     */
+    public static <T> RepeatableIterator<T> repeatable(Iterator<T> iterator) {
+        if (iterator instanceof RepeatableIterator) {
+            return (RepeatableIterator<T>) iterator;
+        }
+        throw new UnsupportedOperationException("repeatable");
     }
 
     public static <T> PushBackIterator<T> pushbackable(final Iterator<T> source) {
@@ -124,19 +135,28 @@ public final class Iterators {
 
 
     private static <T> Iterator<T> reInitializableCollectionIterator(Collection<T> collection) {
-        class It<T> implements Iterable<T>, Iterator<T>  {
+        class It<T> implements Iterable<T>, Iterator<T>, RepeatableIterator<T>  {
             private final Collection<T> collection;
             private Iterator<T> iter = null;
 
             public It(Collection<T> collection) {
                 this.collection = collection;
-                iterator();
+                reInit();
             }
 
             @Override
             public Iterator<T> iterator() {
-                this.iter = collection.iterator();
+                reInit();
                 return iter;
+            }
+
+            @Override
+            public void reset() {
+                reInit();
+            }
+
+            private void reInit() {
+                this.iter = collection.iterator();
             }
 
             @Override

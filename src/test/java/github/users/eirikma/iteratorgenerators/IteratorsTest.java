@@ -47,7 +47,7 @@ public class IteratorsTest {
 
     @Test
     public void generatorShouldBeAbleToIterateSeveralTimes() {
-        Iterator<String> generator = generator(new Generator<String>() {
+        RepeatableIterator<String> generator = generator(new Generator<String>() {
             @Override
             public void initialize() {
                 count = 0;
@@ -63,6 +63,8 @@ public class IteratorsTest {
         });
 
         assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
+
+        generator.reset();
 
         assertThat(collect(((Iterable<String>) generator).iterator()), is(asList("test-1", "test-2", "test-3", "test-4")));
     }
