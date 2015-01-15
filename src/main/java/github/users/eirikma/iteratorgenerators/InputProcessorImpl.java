@@ -5,15 +5,21 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Stack;
 
-class InputProcessorImpl<I,O> implements Iterator<O>, Iterable<O>, PushBackIterator<O> {
-    private GeneratorOutput<O> state;
+class InputProcessorImpl<C, I,O> implements Iterator<O>, Iterable<O>, PushBackIterator<O> {
+    private C context;
+    private GeneratorState<O,C> state;
     private long counter = 0L;
     private final LinkedList<O> output = new LinkedList<>();
     private final Stack<O> pushbacks = new Stack<>();
     private final PushBackIterator<I> input;
-    private final InputProcessor<I,O> generator;
+    private final InputProcessor<I,O,C> generator;
 
-    InputProcessorImpl(PushBackIterator<I> input, InputProcessor<I, O> p) {
+    InputProcessorImpl(PushBackIterator<I> input, InputProcessor<I, O, C> p) {
+        this(null, input, p);
+    }
+
+    InputProcessorImpl(C context, PushBackIterator<I> input, InputProcessor<I, O, C> p) {
+        this.context = context;
         this.input = input;
         generator = p;
         reInitialize();
@@ -21,7 +27,7 @@ class InputProcessorImpl<I,O> implements Iterator<O>, Iterable<O>, PushBackItera
 
     private void reInitialize() {
         counter = 0L;
-        state = new GeneratorOutput<O>() {
+        state = new GeneratorState<O,C>() {
             O last = null;
             @Override
             public void yield(O value) {
@@ -36,6 +42,11 @@ class InputProcessorImpl<I,O> implements Iterator<O>, Iterable<O>, PushBackItera
             @Override
             public long invocationNumber() {
                 return counter;
+            }
+
+            @Override
+            public C context() {
+                return context;
             }
         };
         generator.initialize();

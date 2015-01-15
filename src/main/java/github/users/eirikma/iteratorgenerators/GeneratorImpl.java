@@ -5,22 +5,27 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Stack;
 
-class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T>, PushBackIterator<T> {
+class GeneratorImpl<T,C> implements RepeatableIterator<T>, Iterable<T>, PushBackIterator<T> {
+    private final C context;
     private long counter = 0L;
-    private GeneratorOutput<T> state;
+    private GeneratorState<T,C> state;
     private final LinkedList<T> output = new LinkedList<>();
     private final Stack<T> pushbacks = new Stack<>();
-    private final Generator<T> generator;
+    private final Generator<T,C> generator;
 
-    GeneratorImpl(Generator<T> g) {
+    GeneratorImpl(Generator<T,C> g, C context) {
         generator = g;
+        this.context = context;
         reInitialize();
+    }
+    GeneratorImpl(Generator<T,C> g) {
+        this(g, null);
     }
 
     private void reInitialize() {
         pushbacks.clear();
         counter = 0L;
-        state = new GeneratorOutput<T>() {
+        state = new GeneratorState<T,C>() {
             T last = null;
             @Override
             public void yield(T value) {
@@ -35,6 +40,11 @@ class GeneratorImpl<T> implements RepeatableIterator<T>, Iterable<T>, PushBackIt
             @Override
             public long invocationNumber() {
                 return counter;
+            }
+
+            @Override
+            public C context() {
+                return context;
             }
         };
         generator.initialize();

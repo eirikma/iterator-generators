@@ -1,13 +1,12 @@
 package github.users.eirikma.iteratorgenerators;
 
-import org.hamcrest.CoreMatchers;
 import org.junit.Test;
 
 import java.util.Map;
 
 import static github.users.eirikma.iteratorgenerators.Maps.entry;
 import static github.users.eirikma.iteratorgenerators.Maps.map;
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 

@@ -1,7 +1,8 @@
 package github.users.eirikma.iteratorgenerators;
 
-public interface GeneratorOutput<T> {
+public interface GeneratorState<T,C> {
     void yield(T value);
     public T last();
     long invocationNumber();
+    public C context();
 }
