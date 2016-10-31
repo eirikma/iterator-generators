@@ -36,40 +36,42 @@ public final class Iterators {
             public Holder(E element) {
                 this.element = element;
             }
-
             E element;
         }
         return new UnmodifiableIterator<T>() {
-            private LinkedList<T> yieldedValues = new LinkedList<T>();
+            private final LinkedList<T> yieldedValues = new LinkedList<T>();
             private final Holder<S> stateHolder = new Holder<S>(initialState);
             private final Holder<T> lastYield = new Holder<T>(null);
+            private long yieldCount = 0L;
+            private final Yield<S, T> yield = new Yield<S, T>() {
+                @Override
+                public void yield(T element) {
+                    yieldedValues.addLast(element);
+                    lastYield.element = element;
+                    yieldCount++;
+                }
+                @Override
+                public S getState() {
+                    return stateHolder.element;
+                }
+                @Override
+                public void setState(S state) {
+                    stateHolder.element = state;
+                }
+                @Override
+                public T previous() {
+                    return lastYield.element;
+                }
+                @Override
+                public long count() {
+                    return yieldCount;
+                }
+            };
 
             @Override
             public boolean hasNext() {
                 if (yieldedValues.isEmpty()) {
-                    generator.yieldNextValues(new Yield<S, T>() {
-                        @Override
-                        public void yield(T element) {
-                            yieldedValues.addLast(element);
-                            // consider moving this til after yieldNextValues returns:
-                            lastYield.element = element;
-                        }
-
-                        @Override
-                        public S getState() {
-                            return stateHolder.element;
-                        }
-
-                        @Override
-                        public void setState(S state) {
-                            stateHolder.element = state;
-                        }
-
-                        @Override
-                        public T previous() {
-                            return lastYield.element;
-                        }
-                    });
+                    generator.yieldNextValues(yield);
                 }
                 return !yieldedValues.isEmpty();
             }

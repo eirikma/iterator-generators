@@ -5,7 +5,8 @@ package github.users.eirikma.iteratorgenerators;
  * If Iterator resembles an InputStream for higher-level objects, then Yield corresponds to OutputStream for objects:
  * a target interface for delivering a stream of objects that others can consume (for instance using an Iterator).
  *
- * @param <S> "state" that may be kept between invocations
+ * @param <S> "state" that may be kept between invocations. Any object you might like to keep.
+ *            Use for instance a HashMap or Tuple if you want to keep several values.
  * @param <T> "target" or result object type output from this generator
  */
 public interface Yield<S, T> {
@@ -32,4 +33,9 @@ public interface Yield<S, T> {
      * Get the state that was saved using setState(S).
      */
     S getState();
+
+    /**
+     * @return number of items yielded
+     */
+    long count();
 }
