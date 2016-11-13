@@ -1,7 +1,8 @@
 package github.users.eirikma.iteratorgenerators;
 
 /**
- * Created by emaus on 31.10.2016.
+ * tuple of 3 different values of the same or different type
  */
-public class Tuple3 {
+public class Tuple3<A,B,C> {
+
 }

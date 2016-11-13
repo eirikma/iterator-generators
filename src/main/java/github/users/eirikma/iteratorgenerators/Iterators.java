@@ -1,13 +1,16 @@
 package github.users.eirikma.iteratorgenerators;
 
 
-import com.google.common.collect.UnmodifiableIterator;
-
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Spliterator.IMMUTABLE;
+import static java.util.Spliterator.ORDERED;
 
 public final class Iterators {
     private Iterators() {
@@ -19,17 +22,39 @@ public final class Iterators {
         };
     }
 
-    public static <T> Iterator<T> values(T... values) {
-        return reInitializableCollectionIterator(Arrays.asList(values));
+
+    public static <T> IteratorExt<T> values(T... values) {
+        Iterator<T> iterator = Arrays.asList(values).iterator();
+        return new IteratorExt<T>() {
+            int pos = 0;
+            @Override
+            public boolean hasNext() {
+                return iterator.hasNext();
+            }
+
+            @Override
+            public T next() {
+                T next = iterator.next();
+                pos++;
+                return next;
+            }
+
+            @Override
+            public int available() {
+                int length = values.length;
+                return length - pos;
+            }
+        };
     }
 
 
-    public static <T> Iterator<T> generator(Generator<T, T> generator) {
+
+    public static <T> IteratorExt<T> generator(Generator<T, T> generator) {
         return generatorWithState(null, generator);
     }
 
 
-    public static <T, S> Iterator<T> generatorWithState(final S initialState,
+    public static <T, S> IteratorExt<T> generatorWithState(final S initialState,
                                                         Generator<T, S> generator) {
         checkNotNull(generator);
         class Holder<E> {
@@ -38,12 +63,14 @@ public final class Iterators {
             }
             E element;
         }
-        return new UnmodifiableIterator<T>() {
+        return new IteratorExt<T>() {
             private final LinkedList<T> yieldedValues = new LinkedList<T>();
             private final Holder<S> stateHolder = new Holder<S>(initialState);
             private final Holder<T> lastYield = new Holder<T>(null);
             private long yieldCount = 0L;
+            boolean closed = false;
             private final Yield<S, T> yield = new Yield<S, T>() {
+
                 @Override
                 public void yield(T element) {
                     yieldedValues.addLast(element);
@@ -66,6 +93,16 @@ public final class Iterators {
                 public long count() {
                     return yieldCount;
                 }
+
+                @Override
+                public void close() throws IOException {
+                    closeIterator();
+                }
+
+                @Override
+                public boolean isClosed() {
+                    return yieldedValues.isEmpty() && closed;
+                }
             };
 
             @Override
@@ -83,25 +120,42 @@ public final class Iterators {
                 }
                 throw new NoSuchElementException("next");
             }
+
+            @Override
+            public int available() {
+                // hm....    hasNext() might block
+                return hasNext() ? yieldedValues.size() : 0;
+            }
+
+            @Override
+            public void close() throws IOException {
+                closeIterator();
+            }
+
+            private void closeIterator() {
+                this.closed = false;
+            }
+
+            @Override
+            public boolean isClosed() {
+                return closed;
+            }
         };
     }
 
 
-    /**
-     * invoke code and get return value without checked exceptions
-     *
-     * @param callable
-     * @param <V>      type of return value
-     * @return V
-     */
-    static <V> V unchecked(Callable<V> callable) {
-        try {
-            return callable.call();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    public static <T> Iterator<List<T>> batchesOf(int batchSize, Iterator<T> iterator) {
+        ArrayList<T> batch = new ArrayList<T>(batchSize);
+        return generator((yield -> {
+            while (iterator.hasNext() && batch.size() < batchSize) {
+                batch.add(iterator.next());
+            }
+            if (!batch.isEmpty()) {
+                yield.yield(new ArrayList<T>(batch));
+                batch.clear();
+            }
+        }));
     }
-
 
     /**
      * flattens one level of iterators: iterating the values contained in the provided iterators.
@@ -110,7 +164,7 @@ public final class Iterators {
      * @param <T>       type of elements in those iterators
      * @return the elements inside the iterators
      */
-    public static <T> Iterator<T> flatten(Iterator<Iterator<T>> iterators) {
+    public static <T> IteratorExt<T> flatten(Iterator<Iterator<T>> iterators) {
         return generatorWithState((iterators.hasNext() ? iterators.next() : null), yield -> {
             Iterator<T> current = yield.getState();
             while (current != null && !current.hasNext()) {
@@ -132,11 +186,72 @@ public final class Iterators {
         return Collections.unmodifiableList(retval);
     }
 
+    public static <T> MarkableIterator<T> markable(Iterator<T> inputSource) {
+        return new MarkableIterator<T>() {
+
+            // todo: no, this doesn't work
+
+            boolean markIsSet = false;
+            int maxReadAhead = 0;
+            ArrayList<T> markBuffer = new ArrayList<T>();
+            Iterator<T> readSource = inputSource;
+
+            @Override
+            public void mark(int maxReadaheadLimit) {
+                clearMarkIfExists();
+            }
+
+            private void clearMarkIfExists() {
+                markBuffer.clear();
+                maxReadAhead = 0;
+                markIsSet = false;
+                markBuffer = new ArrayList<T>();
+                readSource = inputSource;
+            }
+
+            @Override
+            public void reset() {
+                if(!markIsSet) {
+                    throw new IllegalStateException("mark is not set");
+                }
+                readSource = markBuffer.iterator();
+                clearMarkIfExists();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return readSource.hasNext() || (inputSource == readSource ? false : inputSource.hasNext());
+            }
+
+            @Override
+            public T next() {
+                if (markIsSet && markBuffer.size() == maxReadAhead) {
+                    clearMarkIfExists();
+                }
+
+                T next = inputSource.next();
+                if (markIsSet) {
+                    markBuffer.add(next);
+                }
+                return next;
+            }
+
+            @Override
+            public int available() {
+                return 0;
+            }
+        };
+    }
 
     public static <T> T[] toArray(Iterator<T> iter, Class<? extends T> type) {
         Collection<T> collection = collect(iter);
         T[] array = (T[]) Array.newInstance(type, collection.size());
         return collection.toArray(array);
+    }
+
+
+    public static <T> Stream<T> stream(Iterator<T> iterator) {
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, ORDERED | IMMUTABLE), false);
     }
 
 
@@ -186,72 +301,89 @@ public final class Iterators {
         });
     }
 
+
     /**
-     * repeat the iteration if it is repeatable (i.e.: implements RepeatableIterator or Iterable).
+     * invoke code and get return value without checked exceptions
      *
-     * @param iterator
-     * @param times
-     * @param <T>
-     * @return the iteration, iterated 'times' times.
+     * @param callable
+     * @param <V>      type of return value
+     * @return V
      */
-    public static <T> Iterator<T> repeat(Iterator<T> iterator, int times) {
-        final int[] repetitions = {0};
-        final Iterator[] iter = {iterator};
-        return generator((state) -> {
-            if (iter[0].hasNext()) {
-                state.yield((T) iter[0].next());
-            } else if (++repetitions[0] < times) {
-                if (iter[0] instanceof RepeatableIterator) {
-                    ((RepeatableIterator) iter[0]).reset();
-                } else if (iterator instanceof Iterable) {
-                    iter[0] = ((Iterable<T>) iterator).iterator();
-                }
-                if (iter[0].hasNext()) {
-                    state.yield((T) iter[0].next());
-                }
-            }
-        });
-    }
-
-
-    private static <T> Iterator<T> reInitializableCollectionIterator(Collection<T> collection) {
-        class It<T> implements Iterable<T>, Iterator<T>, RepeatableIterator<T> {
-            private final Collection<T> collection;
-            private Iterator<T> iter = null;
-
-            public It(Collection<T> collection) {
-                this.collection = collection;
-                reInit();
-            }
-
-            @Override
-            public Iterator<T> iterator() {
-                reInit();
-                return iter;
-            }
-
-            @Override
-            public void reset() {
-                reInit();
-            }
-
-            private void reInit() {
-                this.iter = collection.iterator();
-            }
-
-            @Override
-            public boolean hasNext() {
-                return iter.hasNext();
-            }
-
-            @Override
-            public T next() {
-                return iter.next();
-            }
+    static <V> V unchecked(Callable<V> callable) {
+        try {
+            return callable.call();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        return new It(collection);
     }
 
+
+//    /**
+//     * repeat the iteration if it is repeatable (i.e.: implements RepeatableIterator or Iterable).
+//     *
+//     * @param iterator
+//     * @param times
+//     * @param <T>
+//     * @return the iteration, iterated 'times' times.
+//     */
+//    public static <T> Iterator<T> repeat(Iterator<T> iterator, int times) {
+//        final int[] repetitions = {0};
+//        final Iterator[] iter = {iterator};
+//        return generator((state) -> {
+//            if (iter[0].hasNext()) {
+//                state.yield((T) iter[0].next());
+//            } else if (++repetitions[0] < times) {
+//                if (iter[0] instanceof RepeatableIterator) {
+//                    ((RepeatableIterator) iter[0]).reset();
+//                } else if (iterator instanceof Iterable) {
+//                    iter[0] = ((Iterable<T>) iterator).iterator();
+//                }
+//                if (iter[0].hasNext()) {
+//                    state.yield((T) iter[0].next());
+//                }
+//            }
+//        });
+//    }
+
+//
+//    private static <T> Iterator<T> reInitializableCollectionIterator(Collection<T> collection) {
+//        class It<T> implements Iterable<T>, Iterator<T>, RepeatableIterator<T> {
+//            private final Collection<T> collection;
+//            private Iterator<T> iter = null;
+//
+//            public It(Collection<T> collection) {
+//                this.collection = collection;
+//                reInit();
+//            }
+//
+//            @Override
+//            public Iterator<T> iterator() {
+//                reInit();
+//                return iter;
+//            }
+//
+//            @Override
+//            public void reset() {
+//                reInit();
+//            }
+//
+//            private void reInit() {
+//                this.iter = collection.iterator();
+//            }
+//
+//            @Override
+//            public boolean hasNext() {
+//                return iter.hasNext();
+//            }
+//
+//            @Override
+//            public T next() {
+//                return iter.next();
+//            }
+//        }
+//        return new It(collection);
+//    }
+//
 
 //    private static class RepeatablePushbackableIterator<T> implements Iterator<T>, RepeatableIterator<T>, PushBackIterator<T> {
 //        protected final RepeatableIterator<T> source;

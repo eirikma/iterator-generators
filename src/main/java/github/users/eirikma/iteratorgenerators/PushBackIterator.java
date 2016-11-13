@@ -9,6 +9,6 @@ import java.util.Iterator;
  *
  * @param <T> the type of the elements iterated by the source iterator.
  */
-public interface PushBackIterator<T> extends Iterator<T> {
+public interface PushBackIterator<T> extends IteratorExt<T> {
     public void pushback(T element);
 }

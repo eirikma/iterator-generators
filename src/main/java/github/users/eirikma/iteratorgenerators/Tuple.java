@@ -1,7 +1,7 @@
 package github.users.eirikma.iteratorgenerators;
 
 /**
- * Created by emaus on 31.10.2016.
+ * common interface for Tuples. Currently not much.
  */
 public interface Tuple {
 }
