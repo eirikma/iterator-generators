@@ -1,14 +1,11 @@
 package github.users.eirikma.iteratorgenerators;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Arrays.asList;
-import static org.apache.commons.lang3.StringUtils.join;
 
 /**
  * Created by emaus on 24.10.2016.
@@ -81,7 +78,7 @@ public class CsvReader {
         int highestCount = 0;
         char bestSeparator = candidates[0];
         for (char candidate : candidates) {
-            int occurrences = StringUtils.countMatches(line, ""+candidate);
+            int occurrences = countMatches(line, ""+candidate);
             if (occurrences > bestSeparator) {
                 bestSeparator = candidate;
             }
@@ -89,4 +86,21 @@ public class CsvReader {
         return bestSeparator;
     }
 
+
+    private static int countMatches(String haystack, String needle) {
+        int pos = 0, lastMatch = 0, count = 0;
+        while ((lastMatch = haystack.indexOf(needle, pos)) >= 0 ) {
+            count += 1;
+            pos = lastMatch;
+        }
+        return count;
+    }
+    private static String join(List<String> strings, String separator) {
+        StringBuilder sb = new StringBuilder(strings.size() * 32);
+        for (int i = 0; i < strings.size(); i++) {
+            String s = strings.get(i);
+            sb.append(s).append(separator);
+        }
+        return sb.toString();
+    }
 }

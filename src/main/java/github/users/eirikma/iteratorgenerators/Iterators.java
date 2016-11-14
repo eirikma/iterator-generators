@@ -69,7 +69,7 @@ public final class Iterators {
             private final Holder<T> lastYield = new Holder<T>(null);
             private long yieldCount = 0L;
             boolean closed = false;
-            private final Yield<S, T> yield = new Yield<S, T>() {
+            private final StatefulYield<S, T> yield = new StatefulYield<S, T>() {
 
                 @Override
                 public void yield(T element) {
@@ -77,15 +77,12 @@ public final class Iterators {
                     lastYield.element = element;
                     yieldCount++;
                 }
-                @Override
                 public S getState() {
                     return stateHolder.element;
                 }
-                @Override
                 public void setState(S state) {
                     stateHolder.element = state;
                 }
-                @Override
                 public T previous() {
                     return lastYield.element;
                 }
@@ -199,10 +196,11 @@ public final class Iterators {
             @Override
             public void mark(int maxReadaheadLimit) {
                 clearMarkIfExists();
+                markIsSet = true;
+                maxReadAhead = maxReadaheadLimit;
             }
 
             private void clearMarkIfExists() {
-                markBuffer.clear();
                 maxReadAhead = 0;
                 markIsSet = false;
                 markBuffer = new ArrayList<T>();
@@ -215,12 +213,14 @@ public final class Iterators {
                     throw new IllegalStateException("mark is not set");
                 }
                 readSource = markBuffer.iterator();
-                clearMarkIfExists();
+                maxReadAhead = 0;
+                markIsSet = false;
+                markBuffer = new ArrayList<T>();
             }
 
             @Override
             public boolean hasNext() {
-                return readSource.hasNext() || (inputSource == readSource ? false : inputSource.hasNext());
+                return markIsSet && inputSource.hasNext() || readSource.hasNext();
             }
 
             @Override
@@ -229,7 +229,7 @@ public final class Iterators {
                     clearMarkIfExists();
                 }
 
-                T next = inputSource.next();
+                T next = readSource.next();
                 if (markIsSet) {
                     markBuffer.add(next);
                 }

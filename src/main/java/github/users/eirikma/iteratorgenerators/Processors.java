@@ -5,10 +5,10 @@ import java.util.function.Function;
 
 public class Processors {
 
-    public static <I, S, O>  Processor<I,S,O> transform(Iterator<I> input, Yield<S,O> yield, Function<I, O> function) {
-        return new Processor<I, S, O>() {
+    public static <I, O>  Processor<I,O> transform(Iterator<I> input, Yield<O> yield, Function<I, O> function) {
+        return new Processor<I, O>() {
             @Override
-            public void process(Iterator<I> input, Yield<S, O> output, Function<I, O> function) {
+            public void process(Iterator<I> input, Yield<O> output, Function<I, O> function) {
                 if (input.hasNext()) {
                     output.yield(function.apply(input.next()));
                 }

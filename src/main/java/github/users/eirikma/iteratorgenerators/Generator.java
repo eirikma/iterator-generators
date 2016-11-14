@@ -23,7 +23,7 @@ public interface Generator<T, S> {
          *
          * @param yieldTarget - the target containing the yield(t) method that must be called to yield values.
          */
-    void yieldNextValues(Yield<S, T> yieldTarget);
+    void yieldNextValues(StatefulYield<S, T> yieldTarget);
 
 }
 

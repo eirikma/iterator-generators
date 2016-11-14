@@ -11,7 +11,7 @@ public interface PipelineBuilder {
         PipelineStage from(Iterator<T> source);
     }
     interface PipelineStage<I, S, O> {
-        PipelineStage<I, S, O> to(BiConsumer<Iterator<I>, Yield<S, O>> consumer);
+        PipelineStage<I, S, O> to(BiConsumer<Iterator<I>, Yield<O>> consumer);
 
         Iterator<O> build() ;
     }

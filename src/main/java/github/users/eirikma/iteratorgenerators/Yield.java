@@ -1,5 +1,10 @@
 package github.users.eirikma.iteratorgenerators;
 
+import java.io.Closeable;
+import java.io.IOException;
+
+import static java.lang.Math.min;
+
 /**
  * Yield: interface for outputting a stream/ or sequence of objects generated to some kind of consumer.
  * If Iterator resembles an InputStream for higher-level objects, then Yield corresponds to OutputStream for objects:
@@ -10,35 +15,16 @@ package github.users.eirikma.iteratorgenerators;
  * serializing objects and writing them to an OutputStream or whatever. This interface decouples the
  * actual consumer from the producer of the objects passed on.
  *
- * @param <S> "state" that may be kept between invocations. Any object you might like to keep.
- *            Use for instance a HashMap or Tuple if you want to keep several values.
  * @param <T> "target" or result object type output from this generator. If the Consumer is an Iterator, this will be the type of objects iterated.
  *
  */
-public interface Yield<S, T> extends Closeable {
+public interface Yield<T> extends Closeable {
 
     /**
      * yield a value to output from the iterator
      */
     void yield(T value);
 
-
-    /**
-     * returns the last element yielded
-     */
-    T previous();
-
-    /**
-     * Set some state that the Generator might want to keep between calls.
-     *
-     * @param state
-     */
-    void setState(S state);
-
-    /**
-     * Get the state that was saved using setState(S).
-     */
-    S getState();
 
     /**
      * @return number of items yielded
