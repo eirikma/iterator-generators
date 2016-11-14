@@ -7,6 +7,7 @@ import java.util.Iterator;
  * Not all iterators supports this Some of the same functionality is provided via the java.util.Iterable interface as well.
  *
  */
+@Deprecated
 public interface RepeatableIterator<T> extends Iterator<T> {
     public void reset();
 }

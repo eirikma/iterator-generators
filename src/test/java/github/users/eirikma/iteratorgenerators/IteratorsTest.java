@@ -53,52 +53,28 @@ public class IteratorsTest {
 
     @Test
     public void testGeneratorShouldIterateAllValuesProduced() throws Exception {
-        RepeatableIterator<String> generator = generator(state -> {
-            if (state.invocationNumber() < 5) {
-                state.yield("test-" + state.invocationNumber());
+        Iterator<String> generator = generator(yield -> {
+            if (yield.count() < 5) {
+                yield.yield("test-" + yield.count());
             }
         });
-        assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
+        assertThat(collect(generator), is(asList("test-0", "test-1", "test-2", "test-3", "test-4")));
     }
 
     @Test
     public void generatorWithPreviousAndCountCanHoldState() {
         assertThat(collect(
-                           generator(0, state -> {
-                               if (state.invocationNumber() > 4) {
+                           generatorWithState(0, yield -> {
+                               if (yield.count() >= 4) {
                                    return;
                                }
-                               final Integer prev = state.context();
+                               final Integer prev = yield.getState();
                                int value = prev + 1;
-                               state.yield("" + prev + "-is-followed-by-" + value);
-                               state.setContext(value);
+                               yield.yield("" + prev + "-is-followed-by-" + value);
+                               yield.setState(value);
                            })
                    ),
                    is(asList("0-is-followed-by-1", "1-is-followed-by-2", "2-is-followed-by-3", "3-is-followed-by-4")));
-    }
-
-
-    @Test
-    public void generatorShouldBeAbleToIterateSeveralTimesWithReinitializationInClosure() {
-        RepeatableIterator<String> generator = generator(new Generator<String, Void>() {
-            int count = 0;
-            @Override
-            public void initialize() {
-                count = 0;
-            }
-            @Override
-            public void nextValue(GeneratorState<String, Void> state) {
-                if (++count < 5) {
-                    state.yield("test-" + count);
-                }
-            }
-        });
-
-        assertThat(collect(generator), is(asList("test-1", "test-2", "test-3", "test-4")));
-
-        generator.reset();
-
-        assertThat(collect(((Iterable<String>) generator).iterator()), is(asList("test-1", "test-2", "test-3", "test-4")));
     }
 
     @Test
@@ -125,32 +101,32 @@ public class IteratorsTest {
     }
 
 
-    @Test
-    public void testInputProcessorShouldTransformInput() throws Exception {
-        assertThat(
-                collect(inputProcessor(values(1, 2, 3), (iterator, state) -> {
-                    if (iterator.hasNext()) {
-                        state.yield("value-" + iterator.next());
-                    }
-                })),
-                is(asList("value-1", "value-2", "value-3"))
-        );
-    }
+//    @Test
+//    public void testInputProcessorShouldTransformInput() throws Exception {
+//        assertThat(
+//                collect(inputProcessor(values(1, 2, 3), (iterator, state) -> {
+//                    if (iterator.hasNext()) {
+//                        state.yield("value-" + iterator.next());
+//                    }
+//                })),
+//                is(asList("value-1", "value-2", "value-3"))
+//        );
+//    }
 
-    @Test
-    public void testInputProcessorWithContextShouldTransformInput() throws Exception {
-        String context = "ctx";
-        assertThat(
-                collect(inputProcessor(context, values(1, 2, 3), (iterator, state) -> {
-                    // not so advanced use of context, but it could have been a database lookup or something.
-                    String cont = state.context();
-                    if (iterator.hasNext()) {
-                        state.yield("value-" + cont + "-" + iterator.next());
-                    }
-                })),
-                is(asList("value-ctx-1", "value-ctx-2", "value-ctx-3"))
-        );
-    }
+//    @Test
+//    public void testInputProcessorWithContextShouldTransformInput() throws Exception {
+//        String context = "ctx";
+//        assertThat(
+//                collect(inputProcessor(context, values(1, 2, 3), (iterator, state) -> {
+//                    // not so advanced use of context, but it could have been a database lookup or something.
+//                    String cont = state.context();
+//                    if (iterator.hasNext()) {
+//                        state.yield("value-" + cont + "-" + iterator.next());
+//                    }
+//                })),
+//                is(asList("value-ctx-1", "value-ctx-2", "value-ctx-3"))
+//        );
+//    }
 
 
     @Test

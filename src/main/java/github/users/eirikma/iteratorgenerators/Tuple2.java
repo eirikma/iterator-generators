@@ -2,7 +2,7 @@ package github.users.eirikma.iteratorgenerators;
 
 import java.util.Map;
 
-public class Tuple2<K,V> implements Map.Entry<K,V> {
+public class Tuple2<K,V> implements Map.Entry<K,V>, Tuple {
 
     private final K first;
     private final V second;
