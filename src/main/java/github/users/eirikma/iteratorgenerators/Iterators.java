@@ -17,9 +17,7 @@ public final class Iterators {
     }
 
     public static <T> Iterable<T> eachOf(final Iterator<T> iterator) {
-        return () -> {
-            return (iterator instanceof Iterable ? ((Iterable) iterator).iterator() : iterator);
-        };
+        return () -> (iterator instanceof Iterable ? ((Iterable) iterator).iterator() : iterator);
     }
 
 
@@ -49,16 +47,18 @@ public final class Iterators {
 
 
 
-    public static <T> IteratorExt<T> generator(Generator<T, T> generator) {
-        return generatorWithState(null, generator);
+    public static <T> IteratorExt<T> generator(Generator<T, Yield<T>> generator) {
+        checkNotNull(generator);
+        // faking it: there is actually only one implementation: the one capable of holding state.
+        return generatorWithState(null, (GeneratorWithState<T, T>) yieldTarget -> generator.yieldNextValues(yieldTarget));
     }
 
 
     public static <T, S> IteratorExt<T> generatorWithState(final S initialState,
-                                                        Generator<T, S> generator) {
+                                                        GeneratorWithState<T, S> generator) {
         checkNotNull(generator);
         class Holder<E> {
-            public Holder(E element) {
+            Holder(E element) {
                 this.element = element;
             }
             E element;
@@ -141,7 +141,7 @@ public final class Iterators {
     }
 
 
-    public static <T> Iterator<List<T>> batchesOf(int batchSize, Iterator<T> iterator) {
+    public static <T> IteratorExt<List<T>> batchesOf(int batchSize, Iterator<T> iterator) {
         ArrayList<T> batch = new ArrayList<T>(batchSize);
         return generator((yield -> {
             while (iterator.hasNext() && batch.size() < batchSize) {
@@ -186,25 +186,26 @@ public final class Iterators {
     public static <T> MarkableIterator<T> markable(Iterator<T> inputSource) {
         return new MarkableIterator<T>() {
 
-            // todo: no, this doesn't work
-
             boolean markIsSet = false;
             int maxReadAhead = 0;
             ArrayList<T> markBuffer = new ArrayList<T>();
+            ArrayList<T> readBuffer = new ArrayList<T>();
             Iterator<T> readSource = inputSource;
 
             @Override
             public void mark(int maxReadaheadLimit) {
+                if (maxReadaheadLimit < 0) {
+                    throw new IllegalArgumentException("maxReadAhead must be >= 0, not: " + maxReadaheadLimit);
+                }
                 clearMarkIfExists();
                 markIsSet = true;
                 maxReadAhead = maxReadaheadLimit;
+                markBuffer = new ArrayList<T>(maxReadaheadLimit);
             }
 
             private void clearMarkIfExists() {
                 maxReadAhead = 0;
                 markIsSet = false;
-                markBuffer = new ArrayList<T>();
-                readSource = inputSource;
             }
 
             @Override
@@ -212,21 +213,27 @@ public final class Iterators {
                 if(!markIsSet) {
                     throw new IllegalStateException("mark is not set");
                 }
-                readSource = markBuffer.iterator();
+                switchToReReadItemsFromMark();
                 maxReadAhead = 0;
                 markIsSet = false;
-                markBuffer = new ArrayList<T>();
+            }
+
+            private void switchToReReadItemsFromMark() {
+                readBuffer.clear();
+                readBuffer.addAll(markBuffer);
+                readSource = readBuffer.iterator();
             }
 
             @Override
             public boolean hasNext() {
-                return markIsSet && inputSource.hasNext() || readSource.hasNext();
+                return readSource.hasNext();
             }
 
             @Override
             public T next() {
                 if (markIsSet && markBuffer.size() == maxReadAhead) {
                     clearMarkIfExists();
+                    readSource = inputSource;
                 }
 
                 T next = readSource.next();

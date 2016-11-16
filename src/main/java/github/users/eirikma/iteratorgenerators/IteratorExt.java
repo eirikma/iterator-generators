@@ -3,9 +3,13 @@ package github.users.eirikma.iteratorgenerators;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
 
 public interface IteratorExt<T> extends Iterator<T>, Closeable, Iterable<T> {
 
@@ -78,5 +82,14 @@ public interface IteratorExt<T> extends Iterator<T>, Closeable, Iterable<T> {
     @Override
     default void remove() {
         throw new UnsupportedOperationException("Iterator.remove()");
+    }
+
+
+    default <R, A> R collect(Collector<? super T, A, R> collector){
+        // code stolen from java stream
+        A container = collector.supplier().get();
+        BiConsumer<A, ? super T> accumulator = collector.accumulator();
+        forEach(u -> accumulator.accept(container, u));
+        return collector.finisher().apply(container);
     }
 }
