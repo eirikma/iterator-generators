@@ -5,10 +5,18 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.function.BiConsumer;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Arrays.asList;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.ORDERED;
 
@@ -20,9 +28,24 @@ public final class Iterators {
         return () -> (iterator instanceof Iterable ? ((Iterable) iterator).iterator() : iterator);
     }
 
+    public static <T> IteratorExt<T> iteratorExt(Iterator<T> iterator) {
+        return iterator instanceof IteratorExt ?
+                (IteratorExt<T>) iterator :
+                new IteratorExt<T>() {
+                    @Override
+                    public boolean hasNext() {
+                        return false;
+                    }
+
+                    @Override
+                    public T next() {
+                        return null;
+                    }
+                };
+    }
 
     public static <T> IteratorExt<T> values(T... values) {
-        Iterator<T> iterator = Arrays.asList(values).iterator();
+        Iterator<T> iterator = asList(values).iterator();
         return new IteratorExt<T>() {
             int pos = 0;
             @Override
@@ -45,6 +68,10 @@ public final class Iterators {
         };
     }
 
+
+    public static <I, O> Iterator<O> process(final Iterator<I> input, Processor<I, O> processor) {
+        return generator(yield -> processor.process(input, yield));
+    }
 
 
     public static <T> IteratorExt<T> generator(Generator<T, Yield<T>> generator) {
@@ -256,6 +283,30 @@ public final class Iterators {
         return collection.toArray(array);
     }
 
+    public static  <I,O> IteratorExt<O> background(Iterator<I> input, Processor<I,O> processor) {
+        return background(yield -> processor.process(input, yield));
+    }
+
+    public static  <O> IteratorExt<O> background(Generator<O,Yield<O>> generator) {
+        MultiThreadedObjectPipe<O> pipe = new MultiThreadedObjectPipe<>();
+        Thread thread = new Thread(() -> {
+            Yield<O> yield = pipe.getYieldTarget();
+            while(!yield.isClosed()) {
+                long before = yield.count();
+                generator.yieldNextValues(yield);
+                if (yield.count() == before) {
+                    try {
+                        yield.close();
+                    } catch (IOException e) {
+                        // not going to happen
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        });
+        thread.start();
+        return pipe.getIterator();
+    }
 
     public static <T> Stream<T> stream(Iterator<T> iterator) {
         return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, ORDERED | IMMUTABLE), false);
@@ -324,160 +375,5 @@ public final class Iterators {
         }
     }
 
-
-//    /**
-//     * repeat the iteration if it is repeatable (i.e.: implements RepeatableIterator or Iterable).
-//     *
-//     * @param iterator
-//     * @param times
-//     * @param <T>
-//     * @return the iteration, iterated 'times' times.
-//     */
-//    public static <T> Iterator<T> repeat(Iterator<T> iterator, int times) {
-//        final int[] repetitions = {0};
-//        final Iterator[] iter = {iterator};
-//        return generator((state) -> {
-//            if (iter[0].hasNext()) {
-//                state.yield((T) iter[0].next());
-//            } else if (++repetitions[0] < times) {
-//                if (iter[0] instanceof RepeatableIterator) {
-//                    ((RepeatableIterator) iter[0]).reset();
-//                } else if (iterator instanceof Iterable) {
-//                    iter[0] = ((Iterable<T>) iterator).iterator();
-//                }
-//                if (iter[0].hasNext()) {
-//                    state.yield((T) iter[0].next());
-//                }
-//            }
-//        });
-//    }
-
-//
-//    private static <T> Iterator<T> reInitializableCollectionIterator(Collection<T> collection) {
-//        class It<T> implements Iterable<T>, Iterator<T>, RepeatableIterator<T> {
-//            private final Collection<T> collection;
-//            private Iterator<T> iter = null;
-//
-//            public It(Collection<T> collection) {
-//                this.collection = collection;
-//                reInit();
-//            }
-//
-//            @Override
-//            public Iterator<T> iterator() {
-//                reInit();
-//                return iter;
-//            }
-//
-//            @Override
-//            public void reset() {
-//                reInit();
-//            }
-//
-//            private void reInit() {
-//                this.iter = collection.iterator();
-//            }
-//
-//            @Override
-//            public boolean hasNext() {
-//                return iter.hasNext();
-//            }
-//
-//            @Override
-//            public T next() {
-//                return iter.next();
-//            }
-//        }
-//        return new It(collection);
-//    }
-//
-
-//    private static class RepeatablePushbackableIterator<T> implements Iterator<T>, RepeatableIterator<T>, PushBackIterator<T> {
-//        protected final RepeatableIterator<T> source;
-//        private Stack<T> pushbackStack = new Stack<>();
-//
-//        public RepeatablePushbackableIterator(RepeatableIterator<T> source) {
-//            this.source = source;
-//        }
-//
-//        @Override
-//        public void pushback(T element) {
-//            pushbackStack.push(element);
-//        }
-//
-//        @Override
-//        public void reset() {
-//            // todo: what about the pushback stack? should that be reset as well?
-//            source.reset();
-//        }
-//
-//        @Override
-//        public boolean hasNext() {
-//            return !pushbackStack.isEmpty() || source.hasNext();
-//        }
-//
-//        @Override
-//        public T next() {
-//            if (pushbackStack.size() > 0) {
-//                return pushbackStack.pop();
-//            }
-//            return source.next();
-//        }
-//    }
-//
-//    private static class IterableRepeatablePushbackableIterator<T> extends RepeatablePushbackableIterator<T> implements Iterable<T> {
-//
-//        private final Iterable<T> sourceIterable;
-//
-//        public IterableRepeatablePushbackableIterator(RepeatableIterator<T> source) {
-//            super(source);
-//            sourceIterable = (Iterable<T>) source;
-//        }
-//
-//        @Override
-//        public Iterator<T> iterator() {
-//            // hmmm... this suppresses the call to source.iterator(), but we don't know if that is going to return the same
-//            // iterator of a different one, and it already said it was repeatable, which is more or less the same.
-//            reset();
-//            return this;
-//        }
-//
-//    }
-//
-//    private static class IterablePushbackableIterator<T> implements Iterator<T>, Iterable<T>, PushBackIterator<T> {
-//        private final Iterator<T> source;
-//        private final Iterable<T> sourceIterable;
-//        private final Stack<T> pushbackStack = new Stack<>();
-//
-//        public IterablePushbackableIterator(Iterator<T> source) {
-//            this.source = source;
-//            this.sourceIterable = (Iterable<T>) source;
-//        }
-//
-//        @Override
-//        public void pushback(T element) {
-//            pushbackStack.push(element);
-//        }
-//
-//        @Override
-//        public Iterator<T> iterator() {
-//            // no other way to handle this, sorry.
-//            return pushbackable(sourceIterable.iterator());
-//        }
-//
-//        @Override
-//        public boolean hasNext() {
-//            if (!pushbackStack.isEmpty()) return true;
-//            return source.hasNext();
-//        }
-//
-//        @Override
-//        public T next() {
-//            if (pushbackStack.size() > 0) {
-//                return pushbackStack.pop();
-//            }
-//            return source.next();
-//        }
-//    }
 
 }
