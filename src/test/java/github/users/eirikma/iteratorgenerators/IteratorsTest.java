@@ -3,6 +3,7 @@ package github.users.eirikma.iteratorgenerators;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import java.util.Optional;
 import static github.users.eirikma.iteratorgenerators.Iterators.*;
 import static github.users.eirikma.iteratorgenerators.Maps.entry;
 import static github.users.eirikma.iteratorgenerators.Maps.map;
+import static github.users.eirikma.iteratorgenerators.Maps.reverseMap;
 import static java.util.Arrays.asList;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
@@ -103,28 +105,37 @@ public class IteratorsTest {
     }
 
     @Test
-    public void testBackgroundIteratorShouldNotLoseObjects() {
-        IteratorExt<Long> longSource = background((yield) -> {
-            for (long i = 0, value = yield.count(); i < 3 && value < (2L * /*Integer.MAX_VALUE*/ 10); i++, value++) {
-                yield.yield(value);
-            }
-        });
-        Iterator<String> longStringSource = background(
-                (yield) -> {
-                    if (longSource.hasNext()) {
-                        yield.yield(longSource.next().toString()); ;
-                    }
-                }
-        );
-        Optional<Long> maxValue = Iterators.stream(longStringSource).map(Long::parseLong).reduce((l1, l2) -> {
-            if (l2 != l1 + 1L) {
-                throw new IllegalArgumentException(" l1 = " + l1 + "  l2 = " + l2);
-            }
-            return Long.max(l1, l2);
+    public void testEmptyBackgroundIteratorShouldTerminateImmediately() {
+        final IteratorExt<Object> background = background(yield -> {
+            // nada
         });
 
-        assertThat(maxValue, is(50L));
+        final Collection<Object> values = collect(background);
+        assertThat(values, is(asList()));
     }
+
+    @Test
+    public void testBackgroundIteratorShouldNotLoseObjects() {
+        final long GENERATOR_MAX = 20L * Short.MAX_VALUE;
+        IteratorExt<Long> longSource = background((yield) -> {
+            for (long i = 0, value = yield.count(); i < 3 && value < GENERATOR_MAX; i++) {
+                yield.yield(++value);
+            }
+        });
+
+        assertThat(collect(longSource).size(), is((int) GENERATOR_MAX ));
+
+        Long maxValue = Iterators.stream(Iterators.<Long>background((yield) -> {
+            for (long i = 0, value = yield.count(); i < 3 && value < GENERATOR_MAX; i++) {
+                yield.yield(++value);
+            }
+        })).reduce(0L, Long::max);
+
+        assertThat(maxValue, is(GENERATOR_MAX));
+
+    }
+
+
 
 
 //    @Test

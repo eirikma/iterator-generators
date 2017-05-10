@@ -304,6 +304,7 @@ public final class Iterators {
                 }
             }
         });
+        thread.setDaemon(true);
         thread.start();
         return pipe.getIterator();
     }

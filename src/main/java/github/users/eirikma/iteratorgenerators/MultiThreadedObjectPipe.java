@@ -1,8 +1,11 @@
 package github.users.eirikma.iteratorgenerators;
 
+import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Not thread safe
@@ -10,7 +13,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 class MultiThreadedObjectPipe<T> implements ObjectPipe<T> {
 
     private final BlockingQueue<T> buffer;
-    private volatile  boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile long yieldCount = 0L;
     private Yield<T> yield;
     private IteratorExt<T> iterator;
@@ -29,7 +32,11 @@ class MultiThreadedObjectPipe<T> implements ObjectPipe<T> {
                 if (isClosed()) {
                     throw new RuntimeException("closed");
                 }
-                buffer.add(value);
+                try {
+                    buffer.put(value);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
 
             @Override
@@ -39,23 +46,45 @@ class MultiThreadedObjectPipe<T> implements ObjectPipe<T> {
 
             @Override
             public boolean isClosed() {
-                return closed;
+                return closed.get();
+            }
+
+            @Override
+            public void close() throws IOException {
+                closed.set(true);;
             }
         };
 
         iterator = new IteratorExt<T>() {
+
+            @Override
+            public int available() {
+                return buffer.size();
+            }
+
             @Override
             public boolean hasNext() {
-                return buffer.size() > 0 || !closed;
+                 if (buffer.size() > 0 ) {
+                    return true;
+                }
+                // wait for some outcome from the other thread.
+                while (!closed.get() && buffer.size() <= 0) {
+                     Thread.yield();
+                }
+                return buffer.size() > 0;
             }
 
             @Override
             public T next() {
                 if (hasNext() && !isClosed()) {
                     try {
-                        return buffer.take();
+                        T value = null;
+                        while (value == null && !isClosed()) {
+                            value = buffer.poll(10, TimeUnit.MILLISECONDS);
+                        }
+                        return value;
                     } catch (InterruptedException e) {
-                        closed = true;
+                        closed.set(true);
                         throw new RuntimeException(e);
                     }
                 }
