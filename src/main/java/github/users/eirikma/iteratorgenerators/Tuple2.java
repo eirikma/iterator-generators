@@ -4,8 +4,8 @@ import java.util.Map;
 
 public class Tuple2<K,V> implements Map.Entry<K,V>, Tuple {
 
-    private final K first;
-    private final V second;
+    protected final K first;
+    protected final V second;
 
     public Tuple2(K first, V second) {
         this.first = first;

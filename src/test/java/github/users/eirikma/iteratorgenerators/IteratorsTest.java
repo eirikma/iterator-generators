@@ -44,10 +44,14 @@ public class IteratorsTest {
 
         // typical iterator/iterable usage with 'for' loop:
         Iterator<String> values = values("A", "B", "C");
+        int count = 0;
         for (String v : eachOf(values)) {
             // do something with value v
             assertThat(v.length(), is(1));
+            count++;
         }
+
+        assertThat(count ,is(3));
     }
 
     @Test
@@ -81,10 +85,6 @@ public class IteratorsTest {
                 is(asList("0-is-followed-by-1", "1-is-followed-by-2", "2-is-followed-by-3", "3-is-followed-by-4")));
     }
 
-    @Test
-    public void repeatShouldRepeatIterations() {
-//        assertThat(collect(repeat(values("a", "b"), 3)), is(asList("a", "b", "a", "b", "a", "b")));
-    }
 
 
     @Test
@@ -133,37 +133,54 @@ public class IteratorsTest {
 
         assertThat(maxValue, is(GENERATOR_MAX));
 
+        Long count = Iterators.stream(Iterators.<Long>background((yield) -> {
+            for (long i = 0, value = yield.count(); i < 3 && value < GENERATOR_MAX; i++) {
+                yield.yield(++value);
+            }
+        })).reduce(0L, (l1, l2) -> l1 + 1);
+
+        assertThat(count, is(GENERATOR_MAX));
+
     }
 
 
 
+    @Test
+    public void scenarioSimulatingDataMargeAndEnhancementAcrossSeveralDatabasesShouldRunSmooth() throws Exception {
+        final long GENERATOR_MAX = 20_000;
+        final long BATCH_SIZE_SOURCE = 1000L;
+        final int BATCH_DELAY_MS = 200;
 
-//    @Test
-//    public void testInputProcessorShouldTransformInput() throws Exception {
-//        assertThat(
-//                collect(inputProcessor(values(1, 2, 3), (iterator, state) -> {
-//                    if (iterator.hasNext()) {
-//                        state.yield("value-" + iterator.next());
-//                    }
-//                })),
-//                is(asList("value-1", "value-2", "value-3"))
-//        );
-//    }
+        // wait, then generate one batch of new numbers
+        // simulates a long and slow db query returning lots if rows.
+        IteratorExt<Long> batchSource = background((yield) -> {
+            delayMs(BATCH_DELAY_MS);
+            long startValue = yield.count();
+            for (long i = startValue; i <  startValue + BATCH_SIZE_SOURCE && i < GENERATOR_MAX ; i++) {
+                yield.yield(i);
+            }
+        });
+        // wait, then generate one batch of new numbers
+        // simulates looking up addidional data per row from the previous loop
+        IteratorExt<Tuple3<Long, String, String>> enriched = background(batchSource, (input, yield) -> {
+            if (input.hasNext()) {
+                // consider batchning up a few rows
+                delayMs(1);
+                Long next = input.next();
+                yield.yield(new Tuple3(next, Long.toString(next), Long.toBinaryString(next)));
+            }
+        });
 
-//    @Test
-//    public void testInputProcessorWithContextShouldTransformInput() throws Exception {
-//        String context = "ctx";
-//        assertThat(
-//                collect(inputProcessor(context, values(1, 2, 3), (iterator, state) -> {
-//                    // not so advanced use of context, but it could have been a database lookup or something.
-//                    String cont = state.context();
-//                    if (iterator.hasNext()) {
-//                        state.yield("value-" + cont + "-" + iterator.next());
-//                    }
-//                })),
-//                is(asList("value-ctx-1", "value-ctx-2", "value-ctx-3"))
-//        );
-//    }
+        Iterators.stream(enriched).forEach(System.out::println);
+    }
+
+    private synchronized void delayMs(int delay_ms) {
+        try {
+            wait(delay_ms);
+        } catch (InterruptedException e) {
+            // ignored
+        }
+    }
 
 
     @Test
