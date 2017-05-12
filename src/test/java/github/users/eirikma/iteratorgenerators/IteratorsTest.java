@@ -147,9 +147,9 @@ public class IteratorsTest {
 
     @Test
     public void scenarioSimulatingDataMargeAndEnhancementAcrossSeveralDatabasesShouldRunSmooth() throws Exception {
-        final long GENERATOR_MAX = 20_000;
-        final long BATCH_SIZE_SOURCE = 1000L;
-        final int BATCH_DELAY_MS = 200;
+        final long GENERATOR_MAX = 1000;
+        final long BATCH_SIZE_SOURCE = 80;
+        final int BATCH_DELAY_MS = 10;
 
         // wait, then generate one batch of new numbers
         // simulates a long and slow db query returning lots if rows.
@@ -171,8 +171,15 @@ public class IteratorsTest {
             }
         });
 
-        Iterators.stream(enriched).forEach(System.out::println);
+        //Iterators.stream(enriched).forEach(System.out::println);
+        Iterators.stream(enriched).filter(t -> t.getFirst() % 100 == 1).forEach(System.out::println);
     }
+
+    @Test
+    public void unfinishedBackgroundIteratorShouldNotMakeProgramHangForever() {
+        // todo
+    }
+
 
     private synchronized void delayMs(int delay_ms) {
         try {
